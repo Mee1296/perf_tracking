@@ -18,6 +18,9 @@ app.include_router(auth.router)
 app.include_router(teacher.router)
 app.include_router(student.router)
 
+@app.on_event("startup")
+def startup():
+    Base.metadata.create_all(bind=engine)
 
 @app.get("/")
 def root():
