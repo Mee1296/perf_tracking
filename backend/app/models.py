@@ -16,6 +16,12 @@ class StatusEnum(str, enum.Enum):
     graded = "graded"
 
 
+class SubmissionTypeEnum(str, enum.Enum):
+    text = "text"
+    multiple_choice = "multiple_choice"
+    file = "file"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -38,6 +44,12 @@ class Assignment(Base):
     due_date = Column(DateTime, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     teacher_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    weight = Column(Float, default=100.0, nullable=False)
+
+    # Submission type config
+    submission_type = Column(Enum(SubmissionTypeEnum), default=SubmissionTypeEnum.text, nullable=False)
+    question = Column(Text, nullable=True)          # Question prompt for text / MCQ
+    choices = Column(Text, nullable=True)           # JSON string: ["choice1", "choice2", ...]
 
     teacher = relationship("User", back_populates="assignments_created")
     submissions = relationship("Submission", back_populates="assignment")
@@ -53,8 +65,12 @@ class Submission(Base):
     status = Column(Enum(StatusEnum), default=StatusEnum.pending)
     score = Column(Float, nullable=True)
     max_score = Column(Float, nullable=True)
-    student_note = Column(Text, nullable=True)
     teacher_note = Column(Text, nullable=True)
+
+    # Student answer fields
+    answer_text = Column(Text, nullable=True)         # For text type
+    selected_choice = Column(Integer, nullable=True)  # Index for MCQ
+    file_name = Column(String(255), nullable=True)    # Mock for file upload
 
     assignment = relationship("Assignment", back_populates="submissions")
     student = relationship("User", back_populates="submissions", foreign_keys=[student_id])

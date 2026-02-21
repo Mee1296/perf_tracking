@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional
-from .models import StatusEnum
+from typing import Optional, List
+from .models import StatusEnum, SubmissionTypeEnum
 
 
 class UserCreate(BaseModel):
@@ -30,6 +30,10 @@ class AssignmentCreate(BaseModel):
     description: Optional[str] = None
     due_date: datetime
     max_score: Optional[float] = 100.0
+    weight: Optional[float] = 100.0
+    submission_type: Optional[SubmissionTypeEnum] = SubmissionTypeEnum.text
+    question: Optional[str] = None
+    choices: Optional[str] = None  # JSON string
 
 
 class AssignmentOut(BaseModel):
@@ -40,6 +44,10 @@ class AssignmentOut(BaseModel):
     created_at: datetime
     teacher_id: int
     max_score: Optional[float] = None
+    weight: float = 100.0
+    submission_type: SubmissionTypeEnum = SubmissionTypeEnum.text
+    question: Optional[str] = None
+    choices: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -52,8 +60,10 @@ class SubmissionOut(BaseModel):
     status: StatusEnum
     score: Optional[float]
     max_score: Optional[float]
-    student_note: Optional[str]
     teacher_note: Optional[str]
+    answer_text: Optional[str] = None
+    selected_choice: Optional[int] = None
+    file_name: Optional[str] = None
     assignment: Optional[AssignmentOut] = None
 
     model_config = {"from_attributes": True}
@@ -64,5 +74,7 @@ class GradeUpdate(BaseModel):
     teacher_note: Optional[str] = None
 
 
-class StudentNoteUpdate(BaseModel):
-    student_note: str
+class SubmitAnswer(BaseModel):
+    answer_text: Optional[str] = None
+    selected_choice: Optional[int] = None
+    file_name: Optional[str] = None  # mocked

@@ -31,6 +31,10 @@ def create_assignment(data: AssignmentCreate, teacher_id: int = Query(...), db: 
         description=data.description,
         due_date=data.due_date,
         teacher_id=teacher_id,
+        weight=data.weight if data.weight is not None else 100.0,
+        submission_type=data.submission_type,
+        question=data.question,
+        choices=data.choices,
     )
     db.add(assignment)
     db.commit()

@@ -7,7 +7,7 @@ import io
 
 from ..database import get_db
 from ..models import User, Assignment, Submission, StatusEnum, RoleEnum
-from ..schemas import AssignmentOut, SubmissionOut, StudentNoteUpdate
+from ..schemas import AssignmentOut, SubmissionOut, SubmitAnswer
 
 router = APIRouter(prefix="/student", tags=["student"])
 
@@ -32,7 +32,12 @@ def list_assignments(student_id: int = Query(...), db: Session = Depends(get_db)
 
 
 @router.post("/submissions/{assignment_id}/submit", response_model=SubmissionOut)
-def submit_assignment(assignment_id: int, student_id: int = Query(...), db: Session = Depends(get_db)):
+def submit_assignment(
+    assignment_id: int,
+    data: SubmitAnswer,
+    student_id: int = Query(...),
+    db: Session = Depends(get_db),
+):
     get_student(student_id, db)
     sub = db.query(Submission).options(joinedload(Submission.assignment)).filter(
         Submission.assignment_id == assignment_id,
@@ -45,21 +50,9 @@ def submit_assignment(assignment_id: int, student_id: int = Query(...), db: Sess
 
     sub.submitted_at = datetime.utcnow()
     sub.status = StatusEnum.submitted
-    db.commit()
-    db.refresh(sub)
-    return sub
-
-
-@router.put("/submissions/{submission_id}/note", response_model=SubmissionOut)
-def update_note(submission_id: int, data: StudentNoteUpdate, student_id: int = Query(...), db: Session = Depends(get_db)):
-    get_student(student_id, db)
-    sub = db.query(Submission).options(joinedload(Submission.assignment)).filter(
-        Submission.id == submission_id,
-        Submission.student_id == student_id,
-    ).first()
-    if not sub:
-        raise HTTPException(status_code=404, detail="Submission not found")
-    sub.student_note = data.student_note
+    sub.answer_text = data.answer_text
+    sub.selected_choice = data.selected_choice
+    sub.file_name = data.file_name
     db.commit()
     db.refresh(sub)
     return sub
@@ -89,15 +82,11 @@ def _generate_pdf(student, submissions):
     from reportlab.lib.units import cm
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.pdfbase import pdfmetrics
-    from reportlab.pdfbase.ttfonts import TTFont
-    import os
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=2*cm, rightMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
     styles = getSampleStyleSheet()
 
-    # Use a style that supports Thai via encoding fallback
     title_style = ParagraphStyle("Title", parent=styles["Title"], fontSize=16, spaceAfter=12)
     normal_style = ParagraphStyle("Normal", parent=styles["Normal"], fontSize=10)
 
@@ -106,15 +95,16 @@ def _generate_pdf(student, submissions):
     story.append(Paragraph(f"Username: {student.username} | Year: {student.year or '-'}", normal_style))
     story.append(Spacer(1, 0.5*cm))
 
-    # Table header
-    table_data = [["#", "Assignment", "Due Date", "Status", "Score", "Max Score", "Teacher Note"]]
+    table_data = [["#", "Assignment", "Type", "Due Date", "Status", "Score", "Max Score", "Teacher Note"]]
 
     for i, sub in enumerate(submissions, start=1):
         asgn = sub.assignment
         status_map = {"pending": "Pending", "submitted": "Submitted", "graded": "Graded"}
+        type_map = {"text": "Text", "multiple_choice": "MCQ", "file": "File"}
         table_data.append([
             str(i),
             asgn.title if asgn else "-",
+            type_map.get(asgn.submission_type if asgn else "text", "-"),
             asgn.due_date.strftime("%d/%m/%Y") if asgn else "-",
             status_map.get(sub.status, sub.status),
             str(sub.score) if sub.score is not None else "-",
@@ -122,7 +112,7 @@ def _generate_pdf(student, submissions):
             sub.teacher_note or "-",
         ])
 
-    col_widths = [1*cm, 5*cm, 2.5*cm, 2.5*cm, 1.5*cm, 2*cm, 4.5*cm]
+    col_widths = [0.7*cm, 4*cm, 1.5*cm, 2.3*cm, 2.2*cm, 1.5*cm, 1.8*cm, 4.5*cm]
     t = Table(table_data, colWidths=col_widths)
     t.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#4F46E5")),
@@ -138,7 +128,6 @@ def _generate_pdf(student, submissions):
     ]))
     story.append(t)
 
-    # Summary row
     graded = [s for s in submissions if s.score is not None]
     if graded:
         total = sum(s.score for s in graded)
