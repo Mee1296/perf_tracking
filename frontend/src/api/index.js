@@ -3,7 +3,7 @@ import { getMockData } from "./mockData";
 
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL || "",
-    timeout: 10000, // 10 seconds timeout for Render cold start
+    timeout: 5000, // 5 seconds timeout for Render cold start
 });
 
 // Mock data in case backend is down
